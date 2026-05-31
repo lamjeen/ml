@@ -7,11 +7,8 @@ from pathlib import Path
 
 import joblib
 import json
-import numpy as np
-import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
-from sklearn.metrics import roc_auc_score
 
 from preprocessing import (
     SMOKING_OPTIONS,
@@ -102,69 +99,6 @@ def risk_label(probability: float) -> tuple[str, str]:
     if probability < 0.55:
         return "Moderate risk", "risk-mid"
     return "Higher risk", "risk-high"
-
-
-def plot_roc(metrics: dict) -> go.Figure:
-    curve = metrics.get("roc_curve", {})
-    fpr = curve.get("fpr", [])
-    tpr = curve.get("tpr", [])
-    auc = metrics.get("roc_auc", 0)
-
-    fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
-            x=fpr,
-            y=tpr,
-            mode="lines",
-            name=f"XGBoost (AUC = {auc:.4f})",
-            line=dict(color="#c0392b", width=3),
-            fill="tozeroy",
-            fillcolor="rgba(192, 57, 43, 0.12)",
-        )
-    )
-    fig.add_trace(
-        go.Scatter(
-            x=[0, 1],
-            y=[0, 1],
-            mode="lines",
-            name="Random",
-            line=dict(color="#95a5a6", dash="dash"),
-        )
-    )
-    fig.update_layout(
-        title="ROC Curve — Hold-out Test Set",
-        xaxis_title="False Positive Rate",
-        yaxis_title="True Positive Rate",
-        template="plotly_white",
-        height=420,
-        legend=dict(yanchor="bottom", y=0.02, xanchor="right", x=0.98),
-        margin=dict(l=50, r=30, t=50, b=50),
-    )
-    return fig
-
-
-def plot_feature_importance(model, feature_columns: list[str], top_n: int = 12) -> go.Figure:
-    imp = model.feature_importances_
-    idx = np.argsort(imp)[-top_n:]
-    names = [feature_columns[i] for i in idx]
-    values = imp[idx]
-
-    fig = go.Figure(
-        go.Bar(
-            x=values,
-            y=names,
-            orientation="h",
-            marker_color="#2d3561",
-        )
-    )
-    fig.update_layout(
-        title="Top Feature Importances (XGBoost)",
-        xaxis_title="Importance",
-        template="plotly_white",
-        height=420,
-        margin=dict(l=120, r=30, t=50, b=50),
-    )
-    return fig
 
 
 def render_hero(roc_auc):
@@ -303,45 +237,6 @@ def page_predict(model, scaler, feature_columns, metrics):
         )
 
 
-def page_performance(model, feature_columns, metrics):
-    st.markdown("### Model performance (ROC-AUC focus)")
-    if not metrics:
-        st.warning("Metrics not found. Run `python train_model.py` first.")
-        return
-
-    roc_auc = metrics.get("roc_auc", 0)
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("ROC-AUC (test)", f"{roc_auc:.4f}")
-    report = metrics.get("classification_report", {})
-    c2.metric("Accuracy", f"{report.get('accuracy', 0):.3f}")
-    c3.metric("F1 (class 1)", f"{report.get('1', {}).get('f1-score', 0):.3f}")
-    c4.metric("Test samples", f"{metrics.get('n_test', 0):,}")
-
-    col_a, col_b = st.columns(2)
-    with col_a:
-        st.plotly_chart(plot_roc(metrics), use_container_width=True)
-    with col_b:
-        st.plotly_chart(plot_feature_importance(model, feature_columns), use_container_width=True)
-
-    st.markdown("#### Classification report (test set)")
-    rows = []
-    for label in ["0", "1"]:
-        if label in report:
-            rows.append(
-                {
-                    "Class": "No heart attack" if label == "0" else "Heart attack",
-                    "Precision": report[label]["precision"],
-                    "Recall": report[label]["recall"],
-                    "F1": report[label]["f1-score"],
-                    "Support": int(report[label]["support"]),
-                }
-            )
-    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
-
-    with st.expander("XGBoost hyperparameters (from notebook)"):
-        st.json(metrics.get("xgb_params", {}))
-
-
 def page_about():
     st.markdown(
         """
@@ -389,7 +284,7 @@ def main():
         st.markdown("## Navigation")
         page = st.radio(
             "Go to",
-            ["Predict", "Model performance", "About"],
+            ["Predict", "About"],
             label_visibility="collapsed",
         )
         st.divider()
@@ -399,8 +294,6 @@ def main():
 
     if page == "Predict":
         page_predict(model, scaler, feature_columns, metrics)
-    elif page == "Model performance":
-        page_performance(model, feature_columns, metrics)
     else:
         page_about()
 
