@@ -1,101 +1,48 @@
-"""Train XGBoost model and save artifacts for Streamlit deployment."""
+"""Train XGBoost and persist artifacts for the Streamlit app."""
 
+import json
 from pathlib import Path
 
 import joblib
-import pandas as pd
 import xgboost as xgb
-from sklearn.metrics import roc_auc_score
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import classification_report, roc_auc_score, roc_curve
 
-DATA_PATH = Path(__file__).parent / "heart_attack_prediction_indonesia.csv"
-ARTIFACT_DIR = Path(__file__).parent / "artifacts"
+from preprocessing import XGB_PARAMS, load_and_prepare, split_encode_scale
 
-COLUMNS_TO_DROP = [
-    "alcohol_consumption",
-    "blood_pressure_diastolic",
-    "triglycerides",
-    "physical_activity",
-    "air_pollution_exposure",
-    "participated_in_free_screening",
-    "medication_usage",
-    "EKG_results",
-    "sleep_hours",
-    "stress_level",
-    "dietary_habits",
-    "income_level",
-    "region_Urban",
-    "region",
-    "gender",
-]
+ARTIFACTS_DIR = Path(__file__).resolve().parent / "artifacts"
 
 
-def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
-    out = df.copy()
-    out["age_risk"] = out["age"] ** 2
-    out["metabolic_syndrome"] = (
-        (out["diabetes"] == 1) & (out["hypertension"] == 1) & (out["obesity"] == 1)
-    ).astype(int)
-    out["cholesterol_ratio"] = out["cholesterol_level"] / (out["cholesterol_hdl"] + 1)
-    out["bp_hypertension"] = out["blood_pressure_systolic"] * out["hypertension"]
-    out["age_previous_hd"] = out["age"] * out["previous_heart_disease"]
-    return out
+def main() -> None:
+    ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
 
+    df = load_and_prepare()
+    x_train, x_test, y_train, y_test, scaler, feature_columns = split_encode_scale(df)
 
-def preprocess(df: pd.DataFrame):
-    df = df.drop(columns=[c for c in COLUMNS_TO_DROP if c in df.columns])
-    df = engineer_features(df)
-
-    categorical_features = df.select_dtypes(include=["object", "string"]).columns.tolist()
-    x = df.drop("heart_attack", axis=1)
-    y = df["heart_attack"]
-
-    x_train, x_test, y_train, y_test = train_test_split(
-        x, y, test_size=0.2, random_state=42, stratify=y
-    )
-
-    x_train_processed = pd.get_dummies(x_train, columns=categorical_features, drop_first=True)
-    x_test_processed = pd.get_dummies(x_test, columns=categorical_features, drop_first=True)
-    x_test_processed = x_test_processed.reindex(columns=x_train_processed.columns, fill_value=0)
-
-    scaler = MinMaxScaler()
-    x_train_scaled = scaler.fit_transform(x_train_processed)
-    x_test_scaled = scaler.transform(x_test_processed)
-
-    return x_train_scaled, x_test_scaled, y_train, y_test, scaler, list(x_train_processed.columns)
-
-
-def main():
-    df = pd.read_csv(DATA_PATH)
-    x_train, x_test, y_train, y_test, scaler, feature_columns = preprocess(df)
-
-    model = xgb.XGBClassifier(
-        n_estimators=500,
-        max_depth=5,
-        learning_rate=0.05,
-        subsample=0.9,
-        colsample_bytree=0.9,
-        gamma=0.3,
-        min_child_weight=3,
-        reg_alpha=0.2,
-        reg_lambda=2,
-        random_state=42,
-        eval_metric="logloss",
-    )
+    model = xgb.XGBClassifier(**XGB_PARAMS)
     model.fit(x_train, y_train)
 
     y_probs = model.predict_proba(x_test)[:, 1]
-    roc_auc = roc_auc_score(y_test, y_probs)
+    y_pred = model.predict(x_test)
+    roc_auc = float(roc_auc_score(y_test, y_probs))
+    fpr, tpr, _ = roc_curve(y_test, y_probs)
 
-    ARTIFACT_DIR.mkdir(exist_ok=True)
-    joblib.dump(model, ARTIFACT_DIR / "xgb_model.joblib")
-    joblib.dump(scaler, ARTIFACT_DIR / "scaler.joblib")
-    joblib.dump(feature_columns, ARTIFACT_DIR / "feature_columns.joblib")
-    joblib.dump({"roc_auc": float(roc_auc)}, ARTIFACT_DIR / "metrics.joblib")
+    joblib.dump(model, ARTIFACTS_DIR / "xgb_model.joblib")
+    joblib.dump(scaler, ARTIFACTS_DIR / "scaler.joblib")
+    joblib.dump(feature_columns, ARTIFACTS_DIR / "feature_columns.joblib")
 
-    print(f"Saved artifacts to {ARTIFACT_DIR}")
-    print(f"Test ROC-AUC: {roc_auc:.4f}")
+    metrics = {
+        "roc_auc": roc_auc,
+        "n_train": int(len(y_train)),
+        "n_test": int(len(y_test)),
+        "n_features": len(feature_columns),
+        "classification_report": classification_report(y_test, y_pred, output_dict=True),
+        "roc_curve": {"fpr": fpr.tolist(), "tpr": tpr.tolist()},
+        "xgb_params": XGB_PARAMS,
+    }
+    (ARTIFACTS_DIR / "metrics.json").write_text(json.dumps(metrics, indent=2))
+
+    print(f"ROC-AUC (test): {roc_auc:.4f}")
+    print(f"Artifacts saved to {ARTIFACTS_DIR}")
 
 
 if __name__ == "__main__":
