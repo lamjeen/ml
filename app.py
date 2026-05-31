@@ -16,6 +16,13 @@ ROC_AUC_RESULTS_PATH = ARTIFACTS_DIR / "roc_auc_results.pkl"
 SMOKING_OPTIONS = ["Never", "Past", "Current"]
 SMOKING_MAP = {"Never": 0, "Past": 2, "Current": 3}
 
+# Slider maximums (Streamlit: min_value, max_value, value=default)
+SLIDER_MAX_WAIST = 149
+SLIDER_MAX_HDL = 60
+SLIDER_MAX_LDL = 190
+SLIDER_MAX_SYSTOLIC = 180
+SLIDER_MAX_FASTING = 150
+
 
 def encode_features(row: dict, feature_columns: list) -> pd.DataFrame:
     df = pd.DataFrame([row])
@@ -159,12 +166,25 @@ def page_predict(model, scaler, feature_columns, metrics):
         smoking_status = st.selectbox("Smoking status", SMOKING_OPTIONS)
 
     with right:
-        cholesterol_level = st.slider("Total cholesterol", 100, 240, 200)
-        cholesterol_hdl = st.slider("HDL cholesterol", 8, 60, 50)
-        cholesterol_ldl = st.slider("LDL cholesterol", 0, 190, 130)
-        blood_pressure_systolic = st.slider("Systolic BP (mmHg)", 61, 180, 130)
-        fasting_blood_sugar = st.slider("Fasting blood sugar", 70, 150, 110)
-        waist_circumference = st.slider("Waist circumference (cm)", 20, 149, 120)
+        cholesterol_level = st.slider("Total cholesterol", min_value=100, max_value=240, value=200)
+        cholesterol_hdl = st.slider(
+            "HDL cholesterol", min_value=8, max_value=SLIDER_MAX_HDL, value=50
+        )
+        cholesterol_ldl = st.slider(
+            "LDL cholesterol", min_value=0, max_value=SLIDER_MAX_LDL, value=130
+        )
+        blood_pressure_systolic = st.slider(
+            "Systolic BP (mmHg)", min_value=61, max_value=SLIDER_MAX_SYSTOLIC, value=130
+        )
+        fasting_blood_sugar = st.slider(
+            "Fasting blood sugar", min_value=70, max_value=SLIDER_MAX_FASTING, value=110
+        )
+        waist_circumference = st.slider(
+            "Waist circumference (cm)",
+            min_value=20,
+            max_value=SLIDER_MAX_WAIST,
+            value=90,
+        )
 
     predict = st.button("Predict heart attack risk", type="primary", use_container_width=True)
 
