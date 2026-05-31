@@ -24,10 +24,15 @@ SLIDER_MAX_SYSTOLIC = 180
 SLIDER_MAX_FASTING = 150
 
 
+def _smoking_to_code(value) -> int:
+    if isinstance(value, (int, float)) and not pd.isna(value):
+        return int(value)
+    return SMOKING_MAP[str(value)]
+
+
 def encode_features(row: dict, feature_columns: list) -> pd.DataFrame:
+    row = {**row, "smoking_status": _smoking_to_code(row["smoking_status"])}
     df = pd.DataFrame([row])
-    if df["smoking_status"].dtype == object:
-        df["smoking_status"] = df["smoking_status"].map(SMOKING_MAP)
     df["ldl_hdl_ratio"] = df["cholesterol_ldl"] / (df["cholesterol_hdl"] + 1)
     df["metabolic_syndrome"] = (
         (df["diabetes"] == 1) & (df["hypertension"] == 1) & (df["obesity"] == 1)
@@ -197,7 +202,7 @@ def page_predict(model, scaler, feature_columns, metrics):
             "obesity": obesity,
             "waist_circumference": waist_circumference,
             "family_history": family_history,
-            "smoking_status": smoking_status,
+            "smoking_status": SMOKING_MAP[smoking_status],
             "blood_pressure_systolic": blood_pressure_systolic,
             "fasting_blood_sugar": fasting_blood_sugar,
             "cholesterol_hdl": cholesterol_hdl,
