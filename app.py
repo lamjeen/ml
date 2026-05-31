@@ -6,17 +6,31 @@ Pipeline matches Untitled10.ipynb. Deployment loads ml/artifacts/roc_auc_results
 import pickle
 from pathlib import Path
 
+import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from preprocessing import (
-    SMOKING_OPTIONS,
-    encode_single_row,
-    raw_input_to_frame,
-)
-
 ARTIFACTS_DIR = Path(__file__).resolve().parent / "artifacts"
 ROC_AUC_RESULTS_PATH = ARTIFACTS_DIR / "roc_auc_results.pkl"
+
+SMOKING_OPTIONS = ["Never", "Past", "Current"]
+SMOKING_MAP = {"Never": 0, "Past": 2, "Current": 3}
+
+
+def encode_features(row: dict, feature_columns: list) -> pd.DataFrame:
+    df = pd.DataFrame([row])
+    if df["smoking_status"].dtype == object:
+        df["smoking_status"] = df["smoking_status"].map(SMOKING_MAP)
+    df["ldl_hdl_ratio"] = df["cholesterol_ldl"] / (df["cholesterol_hdl"] + 1)
+    df["metabolic_syndrome"] = (
+        (df["diabetes"] == 1) & (df["hypertension"] == 1) & (df["obesity"] == 1)
+    ).astype(int)
+    df["bp_hypertension"] = df["blood_pressure_systolic"] * df["hypertension"]
+    df["age_previous_hd"] = df["age"] * df["previous_heart_disease"]
+    df["age_smoking"] = df["age"] * df["smoking_status"]
+    df["ldl_with_diabetes"] = df["cholesterol_ldl"] * df["diabetes"]
+    df["medication_usage"] = 0
+    return df[feature_columns]
 
 st.set_page_config(
     page_title="Heart Attack Risk Predictor",
@@ -145,12 +159,12 @@ def page_predict(model, scaler, feature_columns, metrics):
         smoking_status = st.selectbox("Smoking status", SMOKING_OPTIONS)
 
     with right:
-        cholesterol_level = st.slider("Total cholesterol", 100, 350, 200)
-        cholesterol_hdl = st.slider("HDL cholesterol", 8, 93, 50)
-        cholesterol_ldl = st.slider("LDL cholesterol", 0, 282, 130)
-        blood_pressure_systolic = st.slider("Systolic BP (mmHg)", 61, 199, 130)
-        fasting_blood_sugar = st.slider("Fasting blood sugar", 70, 230, 110)
-        waist_circumference = st.slider("Waist circumference (cm)", 20, 173, 90)
+        cholesterol_level = st.slider("Total cholesterol", 100, 240, 200)
+        cholesterol_hdl = st.slider("HDL cholesterol", 8, 60, 50)
+        cholesterol_ldl = st.slider("LDL cholesterol", 0, 190, 130)
+        blood_pressure_systolic = st.slider("Systolic BP (mmHg)", 61, 180, 130)
+        fasting_blood_sugar = st.slider("Fasting blood sugar", 70, 150, 110)
+        waist_circumference = st.slider("Waist circumference (cm)", 20, 149, 120)
 
     predict = st.button("Predict heart attack risk", type="primary", use_container_width=True)
 
@@ -170,8 +184,7 @@ def page_predict(model, scaler, feature_columns, metrics):
             "cholesterol_ldl": cholesterol_ldl,
             "previous_heart_disease": previous_heart_disease,
         }
-        raw_df = raw_input_to_frame(row)
-        encoded = encode_single_row(raw_df, feature_columns)
+        encoded = encode_features(row, feature_columns)
         scaled = scaler.transform(encoded)
         prob = float(model.predict_proba(scaled)[0, 1])
         pred_class = int(prob >= 0.5)
@@ -235,15 +248,9 @@ def page_about():
         """
         ### About this app
 
-        This Streamlit site implements the **XGBoost** pipeline from `Untitled10.ipynb`:
+        XGBoost model loaded from `artifacts/roc_auc_results.pkl` (model, scaler, features, ROC-AUC).
 
-        1. Load Indonesia heart attack prediction data  
-        2. Drop unused columns and engineer features (`metabolic_syndrome`, `cholesterol_ratio`, etc.)  
-        3. Stratified 80/20 split, one-hot encode `smoking_status`, MinMax scaling  
-        4. Train `XGBClassifier` with the same hyperparameters as the notebook  
-        5. Report **ROC-AUC** on the hold-out test set (target metric)
-
-        **Deploy locally**
+        **Run locally**
 
         ```bash
         cd ml
@@ -256,8 +263,6 @@ def page_about():
         - Push the `ml` folder with `artifacts/roc_auc_results.pkl` (model, scaler, features, ROC-AUC).  
         - Set main file: `app.py`  
         - Python 3.10+
-
-        Dataset: ~158k rows, 18 features after engineering, binary target `heart_attack`.
         """
     )
 
