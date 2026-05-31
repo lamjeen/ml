@@ -1,23 +1,22 @@
 """
 Heart Attack Risk Predictor — Streamlit app (XGBoost, ROC-AUC).
-Pipeline matches v2/Untitled10.ipynb.
+Pipeline matches Untitled10.ipynb. Deployment loads ml/artifacts/roc_auc_results.pkl only.
 """
 
+import pickle
 from pathlib import Path
 
-import joblib
-import json
 import plotly.graph_objects as go
 import streamlit as st
 
 from preprocessing import (
     SMOKING_OPTIONS,
     encode_single_row,
-    load_and_prepare,
     raw_input_to_frame,
-    split_encode_scale,
 )
-from train_model import ARTIFACTS_DIR
+
+ARTIFACTS_DIR = Path(__file__).resolve().parent / "artifacts"
+ROC_AUC_RESULTS_PATH = ARTIFACTS_DIR / "roc_auc_results.pkl"
 
 st.set_page_config(
     page_title="Heart Attack Risk Predictor",
@@ -73,24 +72,18 @@ st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 @st.cache_resource
 def load_artifacts():
-    model_path = ARTIFACTS_DIR / "xgb_model.joblib"
-    if not model_path.exists():
+    if not ROC_AUC_RESULTS_PATH.exists():
         return None, None, None, None
-    model = joblib.load(model_path)
-    scaler = joblib.load(ARTIFACTS_DIR / "scaler.joblib")
-    feature_columns = joblib.load(ARTIFACTS_DIR / "feature_columns.joblib")
-    metrics_path = ARTIFACTS_DIR / "metrics.json"
-    metrics = json.loads(metrics_path.read_text()) if metrics_path.exists() else {}
+    with ROC_AUC_RESULTS_PATH.open("rb") as f:
+        bundle = pickle.load(f)
+    model = bundle["model"]
+    scaler = bundle["scaler"]
+    feature_columns = bundle["feature_columns"]
+    metrics = {
+        "roc_auc": bundle.get("roc_auc"),
+        "n_features": len(feature_columns),
+    }
     return model, scaler, feature_columns, metrics
-
-
-def ensure_model_trained():
-    if (ARTIFACTS_DIR / "xgb_model.joblib").exists():
-        return
-    with st.spinner("Training XGBoost model (first run only, ~1–2 min)…"):
-        from train_model import main
-
-        main()
 
 
 def risk_label(probability: float) -> tuple[str, str]:
@@ -253,15 +246,14 @@ def page_about():
         **Deploy locally**
 
         ```bash
-        cd v2
+        cd ml
         pip install -r requirements.txt
-        python train_model.py
         streamlit run app.py
         ```
 
         **Deploy on Streamlit Community Cloud**
 
-        - Push the `v2` folder (include CSV + `artifacts/` or run training in `packages.txt` / startup — recommended: commit `artifacts/` after training once).  
+        - Push the `ml` folder with `artifacts/roc_auc_results.pkl` (model, scaler, features, ROC-AUC).  
         - Set main file: `app.py`  
         - Python 3.10+
 
@@ -271,11 +263,12 @@ def page_about():
 
 
 def main():
-    ensure_model_trained()
     model, scaler, feature_columns, metrics = load_artifacts()
 
     if model is None:
-        st.error("Model could not be loaded. Check `train_model.py` output.")
+        st.error(
+            f"Model bundle not found. Add `{ROC_AUC_RESULTS_PATH.name}` under `artifacts/`."
+        )
         st.stop()
 
     render_hero(metrics.get("roc_auc"))
