@@ -169,7 +169,7 @@ def page_predict(model, scaler, feature_columns, metrics):
         hypertension = st.selectbox("Hypertension", [0, 1], format_func=lambda x: "No" if x == 0 else "Yes")
         diabetes = st.selectbox("Diabetes", [0, 1], format_func=lambda x: "No" if x == 0 else "Yes")
         obesity = st.selectbox("Obesity", [0, 1], format_func=lambda x: "No" if x == 0 else "Yes")
-        family_history = st.selectbox("Family history", [0, 1], format_func=lambda x: "No" if x == 0 else "Yes")
+
         previous_heart_disease = st.selectbox(
             "Previous heart disease", [0, 1], format_func=lambda x: "No" if x == 0 else "Yes"
         )
@@ -219,7 +219,7 @@ def page_predict(model, scaler, feature_columns, metrics):
             "cholesterol_level": cholesterol_level,
             "obesity": obesity,
             "waist_circumference": waist_circumference,
-            "family_history": family_history,
+            "family_history": 0,
             "smoking_status": SMOKING_MAP[smoking_status],
             "blood_pressure_systolic": blood_pressure_systolic,
             "fasting_blood_sugar": fasting_blood_sugar,
