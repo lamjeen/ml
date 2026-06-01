@@ -16,12 +16,13 @@ ROC_AUC_RESULTS_PATH = ARTIFACTS_DIR / "roc_auc_results.pkl"
 SMOKING_OPTIONS = ["Never", "Past", "Current"]
 SMOKING_MAP = {"Never": 0, "Past": 2, "Current": 3}
 
-# Slider maximums (Streamlit: min_value, max_value, value=default)
-SLIDER_MAX_WAIST = 149
-SLIDER_MAX_HDL = 60
-SLIDER_MAX_LDL = 190
-SLIDER_MAX_SYSTOLIC = 180
-SLIDER_MAX_FASTING = 150
+# Slider ranges (min, max) — defaults set in page_predict
+SLIDER_AGE = (18, 90)
+SLIDER_HDL = (20, 100)
+SLIDER_LDL = (50, 250)
+SLIDER_SYSTOLIC = (90, 200)
+SLIDER_FASTING = (60, 200)
+SLIDER_WAIST = (60, 150)
 SLIDER_MAX_TRIGLYCERIDES = 500
 
 
@@ -166,7 +167,7 @@ def page_predict(model, scaler, feature_columns, metrics):
     left, right = st.columns(2)
 
     with left:
-        age = st.slider("Age", 25, 90, 55)
+        age = st.slider("Age", min_value=SLIDER_AGE[0], max_value=SLIDER_AGE[1], value=55)
         hypertension = st.selectbox("Hypertension", [0, 1], format_func=lambda x: "No" if x == 0 else "Yes")
         diabetes = st.selectbox("Diabetes", [0, 1], format_func=lambda x: "No" if x == 0 else "Yes")
         obesity = st.selectbox("Obesity", [0, 1], format_func=lambda x: "No" if x == 0 else "Yes")
@@ -179,21 +180,34 @@ def page_predict(model, scaler, feature_columns, metrics):
     with right:
         cholesterol_level = st.slider("Total cholesterol", min_value=100, max_value=240, value=200)
         cholesterol_hdl = st.slider(
-            "HDL cholesterol", min_value=8, max_value=SLIDER_MAX_HDL, value=50
+            "HDL cholesterol (mg/dL)",
+            min_value=SLIDER_HDL[0],
+            max_value=SLIDER_HDL[1],
+            value=50,
+            help="Values above 60 mg/dL are generally considered protective.",
         )
         cholesterol_ldl = st.slider(
-            "LDL cholesterol", min_value=0, max_value=SLIDER_MAX_LDL, value=130
+            "LDL cholesterol (mg/dL)",
+            min_value=SLIDER_LDL[0],
+            max_value=SLIDER_LDL[1],
+            value=130,
         )
         blood_pressure_systolic = st.slider(
-            "Systolic BP (mmHg)", min_value=61, max_value=SLIDER_MAX_SYSTOLIC, value=130
+            "Systolic BP (mmHg)",
+            min_value=SLIDER_SYSTOLIC[0],
+            max_value=SLIDER_SYSTOLIC[1],
+            value=130,
         )
         fasting_blood_sugar = st.slider(
-            "Fasting blood sugar", min_value=70, max_value=SLIDER_MAX_FASTING, value=110
+            "Fasting blood sugar (mg/dL)",
+            min_value=SLIDER_FASTING[0],
+            max_value=SLIDER_FASTING[1],
+            value=110,
         )
         waist_circumference = st.slider(
             "Waist circumference (cm)",
-            min_value=20,
-            max_value=SLIDER_MAX_WAIST,
+            min_value=SLIDER_WAIST[0],
+            max_value=SLIDER_WAIST[1],
             value=90,
         )
         triglycerides = st.slider(
