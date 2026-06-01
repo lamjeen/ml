@@ -23,7 +23,6 @@ SLIDER_LDL = (50, 250)
 SLIDER_SYSTOLIC = (90, 200)
 SLIDER_FASTING = (60, 200)
 SLIDER_WAIST = (60, 150)
-SLIDER_MAX_TRIGLYCERIDES = 500
 
 
 def _smoking_to_code(value) -> int:
@@ -36,7 +35,6 @@ def encode_features(row: dict, feature_columns: list) -> pd.DataFrame:
     row = {**row, "smoking_status": _smoking_to_code(row["smoking_status"])}
     df = pd.DataFrame([row])
     df["non_hdl_cholesterol"] = df["cholesterol_level"] - df["cholesterol_hdl"]
-    df["tg_hdl_ratio"] = df["triglycerides"] / df["cholesterol_hdl"]
     df["ldl_hdl_ratio"] = df["cholesterol_ldl"] / df["cholesterol_hdl"]
     df["metabolic_syndrome"] = (
         (df["diabetes"] == 1) & (df["hypertension"] == 1) & (df["obesity"] == 1)
@@ -210,12 +208,6 @@ def page_predict(model, scaler, feature_columns, metrics):
             max_value=SLIDER_WAIST[1],
             value=90,
         )
-        triglycerides = st.slider(
-            "Triglycerides (mg/dL)",
-            min_value=50,
-            max_value=SLIDER_MAX_TRIGLYCERIDES,
-            value=150,
-        )
 
     predict = st.button("Predict heart attack risk", type="primary", use_container_width=True)
 
@@ -234,7 +226,6 @@ def page_predict(model, scaler, feature_columns, metrics):
             "cholesterol_hdl": cholesterol_hdl,
             "cholesterol_ldl": cholesterol_ldl,
             "previous_heart_disease": previous_heart_disease,
-            "triglycerides": triglycerides,
         }
         encoded = encode_features(row, feature_columns)
         scaled = scaler.transform(encoded)
