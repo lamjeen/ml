@@ -150,7 +150,7 @@ def page_predict(model, scaler, feature_columns, metrics):
         )
     with col_metrics[1]:
         st.markdown(
-            f'<div class="metric-card"><div class="value">{metrics.get("n_features", "—")}</div>'
+            '<div class="metric-card"><div class="value">12</div>'
             '<div class="label">Features</div></div>',
             unsafe_allow_html=True,
         )
